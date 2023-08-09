@@ -1,25 +1,47 @@
 import express from 'express';
 import ffmpeg from 'fluent-ffmpeg';
+import { convertVideo, deleteProcessedVideo, deleteRawVideo, downloadRawVideo, setupVideoDirectories, uploadProcessedVideo } from './storage';
 
-const app = express();
+setupVideoDirectories()
+const app = express()
 app.use(express.json())
 
-app.post("/process-video", (req, res) => {
-    //request body will have path of request
-    const videoFilePath = req.body.videoFilePath
-    const outputFilePath = req.body.outputFilePath
-    
-    if (!videoFilePath || !outputFilePath){
-        res.status(400).send("Bad request: Missing video file path")
-    }
+app.post("/process-video", async (req, res) => {
 
-    ffmpeg(videoFilePath).outputOptions("-vf", "scale=-1:360")
-    .on("end", () => {
-        res.status(200).send("Video processed successfully");
-    }).on("error", (err) => {
-        return res.status(500).send(`Internal server error: ${err.message}`);
-    })
-    .save(outputFilePath);
+    let data;
+    try {
+        const message = Buffer.from(req.body.message.data, 'base64').toString('utf8')
+        data = JSON.parse(message)
+        if (!data.name) {
+            throw new Error('Invalid message payload received.')
+        }
+    } catch (error) {
+        console.error(error)
+        return res.status(400).send('Bad request: missing fileName')
+    }
+    
+    const inputFileName = data.name
+    const outputFileName = `processed-${inputFileName}`
+
+    await downloadRawVideo(inputFileName)
+
+    try {
+        await convertVideo(inputFileName, outputFileName)
+    } catch (err) {
+        await Promise.all([
+            deleteRawVideo(inputFileName),
+            deleteProcessedVideo(outputFileName)
+        ])
+        console.error(err)
+        return res.status(500).send('Internal Server Error: video processing failed')
+    }
+    await uploadProcessedVideo(outputFileName)
+    await Promise.all([
+        deleteRawVideo(inputFileName),
+        deleteProcessedVideo(outputFileName)
+    ])
+
+    return res.status(200).send("Processing completed successfully")
 });
 
 const port = process.env.PORT || 3000;
