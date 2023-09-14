@@ -46,7 +46,7 @@ export async function uploadProcessedVideo(fileName: string) {
     })
 
     console.log(`${localProcessedVideoPath}/${fileName} has been uploaded to gs://${processedVideoBucketName}/${fileName}`)
-    await bucket.file(fileName).makePublic();
+    await bucket.file(fileName).makePublic(); //specifying the file has to be public
 }
 
 export function deleteRawVideo(fileName: string){
@@ -79,7 +79,7 @@ function deleteVideoFromFileSystem(filePath: string){
 function verifyDirectoryPath(dirPath: string) {
     if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, {recursive: true});
-        console.log(`Direcotry created at ${dirPath}`)
+        console.log(`Directory created at ${dirPath}`)
     } else {
         console.log(`Directory at ${dirPath} exists`)
     }
